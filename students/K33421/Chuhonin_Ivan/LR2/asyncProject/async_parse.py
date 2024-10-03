@@ -1,17 +1,37 @@
 import asyncio
-import time
+from datetime import datetime
 
-from parse_and_save import parse_and_save
+import aiosqlite
+from parse_and_save import parse_and_save_async
 from parse_site import get_sources
 
 
-async def main():
-    # tasks = [asyncio.create_task(await parse_and_save_async(url) for url in get_sources())]
-    sources = ['https://opticdevices.ru' + i for i in get_sources()]
-    tasks = [asyncio.create_task(parse_and_save(url) for url in sources)]
-    await asyncio.gather(*tasks)
+db_path = "async_database.db"
 
-start_time = time.time()
-asyncio.run(main())
-end_time = time.time()
-print(f"time {end_time - start_time}")
+
+async def create_db():
+    async with aiosqlite.connect(db_path) as db:
+        await db.execute("CREATE TABLE IF NOT EXISTS site_data (title TEXT)")
+        await db.execute("DELETE FROM site_data")
+        await db.commit()
+
+
+async def store_string(string_to_store):
+    async with aiosqlite.connect(db_path) as db:
+        await db.execute("INSERT INTO site_data VALUES (?)", (string_to_store,))
+        await db.commit()
+
+
+async def async_worker():
+    sources = ['https://opticdevices.ru' + i for i in get_sources()]
+
+    start_time = datetime.now()
+    await create_db()
+    for url in sources:
+        data = await parse_and_save_async(url)
+        await store_string(data)
+    end_time = datetime.now()
+    print(f"time {end_time - start_time}")
+
+
+asyncio.run(async_worker())
