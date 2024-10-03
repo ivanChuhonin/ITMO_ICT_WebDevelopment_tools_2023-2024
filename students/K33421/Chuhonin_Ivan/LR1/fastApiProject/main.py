@@ -286,34 +286,38 @@ def create_exchange_request(current_user_phone: Annotated[str, Depends(get_curre
 @app.get("/exchange-requests/", response_model=List[ExchangeRequestInfo])
 def read_exchange_requests(current_user_phone: Annotated[str, Depends(get_current_user_phone)],
                            skip: int = 0, limit: int = 10):
-    with Session(engine) as session:
+    with (Session(engine) as session):
         db_reader = get_reader(current_user_phone, session)
 
         request = alias(BookInstance)
         offer = alias(BookInstance)
 
-        statement = select(ExchangeRequest
+        subquery_book_from_request = session.query(Book.id, Book.book_name).subquery()
+        subquery_book_from_offer = session.query(Book.id, Book.book_name).subquery()
+
+        statement = select(ExchangeRequest, subquery_book_from_request.c.book_name, subquery_book_from_offer.c.book_name
             ).join(request, ExchangeRequest.request_book == request.c.id
+            ).join(subquery_book_from_request, request.c.id_book == subquery_book_from_request.c.id
             ).join(offer, ExchangeRequest.offer_book == offer.c.id
+            ).join(subquery_book_from_offer, offer.c.id_book == subquery_book_from_offer.c.id
             ).where(request.c.id_reader == db_reader.id or offer.c.id_reader == db_reader.id
             ).offset(skip).limit(limit)
 
         exchange_requests = session.exec(statement).all()
 
         exchange_request_info_list: List[ExchangeRequestInfo] = []
-        for exchange_request, book_instance_request, book_instance_offer in exchange_requests:
-            book_instance_request_info = get_book_info_instance(book_instance_request, session)
-            book_instance_offer_info = get_book_info_instance(book_instance_offer, session)
+        for exchange_request, request_book_name, offer_book_name in exchange_requests:
             exchange_request_info_list.append(ExchangeRequestInfo(id=exchange_request.id,
                                                                   request_book=exchange_request.request_book,
-                                                                  request_book_name=book_instance_request_info.book_name,
+                                                                  request_book_name=request_book_name,
                                                                   offer_book=exchange_request.offer_book,
-                                                                  offer_book_name=book_instance_offer_info.book_name,
+                                                                  offer_book_name=offer_book_name,
                                                                   request_date=exchange_request.request_book,
                                                                   exchange_start=exchange_request.exchange_start,
                                                                   exchange_end=exchange_request.exchange_end,
                                                                   status=exchange_request.status))
-        return exchange_requests
+
+        return exchange_request_info_list
 
 
 @app.put("/exchange-requests/{exchange_request_id}", response_model=Exchange)

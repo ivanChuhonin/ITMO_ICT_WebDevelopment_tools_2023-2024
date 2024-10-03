@@ -1,7 +1,7 @@
 # from pydantic import BaseModel
 from datetime import datetime
 
-from sqlmodel import Field, SQLModel, UniqueConstraint
+from sqlmodel import Field, SQLModel, UniqueConstraint, Relationship
 from typing import Optional, List, Union
 from enum import Enum
 
@@ -38,6 +38,7 @@ class Book(SQLModel, table=True):
     author: str
     short_description: str
     publishing_house: str
+    book_instances: List["BookInstance"] = Relationship(back_populates="book")
 
 
 class ChoicesBook(Enum):
@@ -51,6 +52,7 @@ class BookInstance(SQLModel, table=True):
     id_book: int = Field(foreign_key="book.id")
     id_reader: int = Field(foreign_key="reader.id")
     status_book: ChoicesBook
+    book: "Book" = Relationship(back_populates="book_instances")
 
 
 class CHOICES(Enum):
