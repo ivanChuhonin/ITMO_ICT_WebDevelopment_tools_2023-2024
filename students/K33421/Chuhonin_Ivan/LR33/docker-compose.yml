@@ -1,0 +1,61 @@
+services:
+  db:
+    image: postgres:latest
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=pguser
+      - POSTGRES_PASSWORD=pgpwd123
+      - POSTGRES_DB=celery_parser
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready" ]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    networks:
+      - lr33_net
+
+  redis:
+    image: redis:alpine
+    ports:
+      - "6379:6379"
+    networks:
+      - lr33_net
+
+  celery:
+    build: ./celery
+    command: celery -A tasks worker -l info
+    depends_on:
+      - redis
+      - db
+    networks:
+      - lr33_net
+
+  producer:
+    build: ./celery
+    command: uvicorn main:app --host 0.0.0.0 --port 8002
+    depends_on:
+      - redis
+      - celery
+    ports:
+      - "8002:8002"
+    networks:
+      - lr33_net
+
+  flower:
+    image: mher/flower
+    ports:
+      - "5555:5555"
+    depends_on:
+      - redis
+      - celery
+      - producer
+    environment:
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=db+postgresql+psycopg2://pguser:pgpwd123@db:5432/celery_parser
+    networks:
+      - lr33_net
+
+networks:
+  lr33_net:
+    external: true
