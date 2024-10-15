@@ -12,9 +12,12 @@ from models import Reader, Book, BookInstance, Exchange, ExchangeHistory, Exchan
 from contextlib import asynccontextmanager
 
 
-sqlite_url = f"sqlite:///./database.db"
-connect_args = {"check_same_thread": False}
-engine = create_engine(sqlite_url, echo=True, connect_args=connect_args)
+# sqlite_url = f"sqlite:///./database.db"
+# connect_args = {"check_same_thread": False}
+# engine = create_engine(sqlite_url, echo=True, connect_args=connect_args)
+# docker run --name pg-books -p 5433:5432 -e POSTGRES_USER=pguser -e POSTGRES_PASSWORD=pgpwd123 -e POSTGRES_DB=pgbook -d postgres
+postgres_url = "postgresql://pguser:pgpwd123@host.docker.internal:5433/pgbook?sslmode=disable"
+engine = create_engine(postgres_url, echo=True)
 
 
 @asynccontextmanager
@@ -24,6 +27,11 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(lifespan=lifespan)
+
+
+@app.get("/hi")
+def update_reader():
+    return {"hi": "done"}
 
 
 def get_reader(current_user_phone: str, session: Session):
